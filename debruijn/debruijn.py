@@ -19,10 +19,10 @@ import sys
 import networkx as nx
 import matplotlib
 from operator import itemgetter
-import random
-random.seed(9001)
-from random import randint
 import statistics
+import random
+from random import randint
+random.seed(9001)
 
 __author__ = "Colin Davidson"
 __copyright__ = "Universite Paris Diderot"
@@ -66,6 +66,8 @@ def get_arguments():
 
 
 def read_fastq(fastq_file):
+    """ TODO
+    """
     with open(fastq_file, 'rt') as f:
         for line in f:
             # Remove \n
@@ -76,11 +78,15 @@ def read_fastq(fastq_file):
 
 
 def cut_kmer(read, kmer_size):
+    """ TODO
+    """
     for i in range(len(read) - kmer_size + 1):
         yield read[i:i+kmer_size]
 
 
 def build_kmer_dict(fastq_file, kmer_size):
+    """ TODO
+    """
     out = dict()
 
     for seq in read_fastq(fastq_file):
@@ -93,6 +99,8 @@ def build_kmer_dict(fastq_file, kmer_size):
 
 
 def build_graph(kmer_dict):
+    """ TODO
+    """
     graph = nx.DiGraph()
     for kmer in kmer_dict:
         pre = kmer[:-1]
@@ -102,42 +110,94 @@ def build_graph(kmer_dict):
 
 
 def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
+    """ TODO
+    """
     pass
 
 def std(data):
+    """ TODO
+    """
     pass
 
 
 def select_best_path(graph, path_list, path_length, weight_avg_list, 
-                     delete_entry_node=False, delete_sink_node=False):
+                    delete_entry_node=False, delete_sink_node=False):
     pass
 
 def path_average_weight(graph, path):
+    """ TODO
+    """
     pass
 
 def solve_bubble(graph, ancestor_node, descendant_node):
+    """ TODO
+    """
     pass
 
 def simplify_bubbles(graph):
+    """ TODO
+    """
     pass
 
 def solve_entry_tips(graph, starting_nodes):
+    """ TODO
+    """
     pass
 
 def solve_out_tips(graph, ending_nodes):
+    """ TODO
+    """
     pass
 
 def get_starting_nodes(graph):
-    pass
+    """ TODO
+    """
+    nodes = []
+    for node in graph.nodes:
+        if list(graph.predecessors(node)) == []:
+            nodes.append(node)
+    return nodes
 
 def get_sink_nodes(graph):
-    pass
+    """ TODO
+    """
+    nodes = []
+    for node in graph.nodes:
+        if list(graph.successors(node)) == []:
+            nodes.append(node)
+    return nodes
 
 def get_contigs(graph, starting_nodes, ending_nodes):
-    pass
+    """ TODO
+    """
+    out = []
+    for start in starting_nodes:
+        for end in ending_nodes:
+            paths = nx.all_simple_paths(graph, start, end)
+            paths = list(paths)
+            if len(paths) != 0:
+                path = paths[0]
+                str_path = path[0]
+                for i in range(1,len(path)):
+                    str_path += path[i][-1]
+                out.append((str_path, len(path) + 1))
+    return out
+
+
+def fill(text, width=80):
+    """Split text with a line return to respect fasta format"""
+    return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
 
 def save_contigs(contigs_list, output_file):
-    pass
+    """ TODO
+    """
+    with open(output_file, 'w') as f:
+        i = 0
+        for contig in contigs_list:
+            text = ">contig_{} len={}\n{}\n".format(i, contig[1], contig[0])
+            text = fill(text)
+            f.write(text)
+            i += 1
 
 #==============================================================
 # Main program
@@ -148,8 +208,18 @@ def main():
     """
     # Get arguments
     args = get_arguments()
+
+    # Build Graph
     d = build_kmer_dict(args.fastq_file, args.kmer_size)
     graph = build_graph(d)
+    starting_nodes = get_starting_nodes(graph)
+    sink_nodes = get_sink_nodes(graph)
+
+    # Get contigs
+    contigs_list = get_contigs(graph, starting_nodes, sink_nodes)
+
+    # Save contigs
+    save_contigs(contigs_list, args.output_file)
 
 
 if __name__ == '__main__':

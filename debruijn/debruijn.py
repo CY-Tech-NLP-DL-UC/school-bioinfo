@@ -24,13 +24,13 @@ random.seed(9001)
 from random import randint
 import statistics
 
-__author__ = "Your Name"
+__author__ = "Colin Davidson"
 __copyright__ = "Universite Paris Diderot"
-__credits__ = ["Your Name"]
+__credits__ = ["Colin Davidson"]
 __license__ = "GPL"
 __version__ = "1.0.0"
-__maintainer__ = "Your Name"
-__email__ = "your@email.fr"
+__maintainer__ = "Colin Davidson"
+__email__ = "davidsonco@eisti.eu"
 __status__ = "Developpement"
 
 def isfile(path):
@@ -66,19 +66,39 @@ def get_arguments():
 
 
 def read_fastq(fastq_file):
-    pass
+    with open(fastq_file, 'rt') as f:
+        for line in f:
+            # Remove \n
+            out = line.rstrip()
+            # Could improve by checking all characters from sentence, but longer
+            if out[0] in ['A','T','C','G']:
+                yield out
 
 
 def cut_kmer(read, kmer_size):
-    pass
+    for i in range(len(read) - kmer_size + 1):
+        yield read[i:i+kmer_size]
 
 
 def build_kmer_dict(fastq_file, kmer_size):
-    pass
+    out = dict()
+
+    for seq in read_fastq(fastq_file):
+        for kmer in cut_kmer(seq, kmer_size):
+            if kmer in out:
+                out[kmer] += 1
+            else:
+                out[kmer] = 1
+    return out
 
 
 def build_graph(kmer_dict):
-    pass
+    graph = nx.DiGraph()
+    for kmer in kmer_dict:
+        pre = kmer[:-1]
+        suf = kmer[1:]
+        graph.add_weighted_edges_from([(pre, suf, kmer_dict[kmer])])
+    return graph
 
 
 def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
@@ -128,6 +148,9 @@ def main():
     """
     # Get arguments
     args = get_arguments()
+    d = build_kmer_dict(args.fastq_file, args.kmer_size)
+    graph = build_graph(d)
+
 
 if __name__ == '__main__':
     main()

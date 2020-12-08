@@ -16,12 +16,13 @@
 import argparse
 import os
 import sys
-import networkx as nx
-import matplotlib
-from operator import itemgetter
 import statistics
 import random
-from random import randint
+import networkx as nx
+import matplotlib.pyplot as plt
+#from operator import itemgetter
+
+#from random import randint
 random.seed(9001)
 
 __author__ = "Colin Davidson"
@@ -71,8 +72,8 @@ def read_fastq(fastq_file):
         fastq_file : Path to the file
       Returns: yields the sequences
     """
-    with open(fastq_file, 'rt') as f:
-        for line in f:
+    with open(fastq_file, 'rt') as file:
+        for line in file:
             # Remove \n
             out = line.rstrip()
             # Could improve by checking all characters from sentence, but longer
@@ -167,24 +168,24 @@ def select_best_path(graph, path_list, path_length, weight_avg_list,
         graph : updated graph (nx.Digraph)
     """
     if path_list == []:
-        print("select_best_path: Empty path list")
+        #print("select_best_path: Empty path list")
         return graph
     # Temporary best path index
     best_path_index = 0
     for i in range(1, len(path_list)):
-        w1 = weight_avg_list[best_path_index]
-        w2 = weight_avg_list[i]
-        l1 = path_length[best_path_index]
-        l2 = path_length[i]
+        w_1 = weight_avg_list[best_path_index]
+        w_2 = weight_avg_list[i]
+        l_1 = path_length[best_path_index]
+        l_2 = path_length[i]
         # Highest weight
-        if w1 < w2:
+        if w_1 < w_2:
             best_path_index = i
-        elif w1 == w2:
+        elif w_1 == w_2:
             # Longest path
-            if l1 < l2:
+            if l_1 < l_2:
                 best_path_index = i
             # Random
-            elif l1 == l2:
+            elif l_1 == l_2:
                 best_path_index = random.choice([best_path_index, i])
 
     # Update graph
@@ -202,16 +203,21 @@ def path_average_weight(graph, path):
         out : average weight (int)
     """
     out = 0
-    if len(path) > 1:
-        for i in range(len(path)-1):
-            for n, nbrs in graph.adj.items():
-                if n == path[i]:
-                    for nbr, eattr in nbrs.items():
-                        if path[i+1] == nbr:
-                            out += eattr['weight']
-                            break
-                    break
-        out /= (len(path)-1)
+    if len(path) <= 1:
+        return out
+    for i in range(len(path)-1):
+        curr_node = path[i]
+        breaking = False
+        for node, nbrs in graph.adj.items():
+            if breaking:
+                break
+            if node == curr_node:
+                for nbr, eattr in nbrs.items():
+                    if path[i+1] == nbr:
+                        out += eattr['weight']
+                        breaking = True
+                        break
+    out /= (len(path)-1)
     return out
 
 def solve_bubble(graph, ancestor_node, descendant_node):
@@ -279,24 +285,24 @@ def solve_entry_tips(graph, starting_nodes):
                     common_nodes.append(common_node)
                 break
         paths[start] = (path, common_node, int(path_average_weight(graph, path)))
-    
+
     # Select best paths
     for node in common_nodes:
         if node == -1:
             break
-        d = {i:paths[i] for i in paths.keys() if common_node == paths[i][1]}
+        sub_paths = {i:paths[i] for i in paths.keys() if common_node == paths[i][1]}
         path = []
         weights = []
         lengths = []
-        for d_key in d:
-            path.append(d[d_key][0])
-            weights.append(d[d_key][2])
-            lengths.append(len(d[d_key][0])-1)
+        for d_key in sub_paths:
+            path.append(sub_paths[d_key][0])
+            weights.append(sub_paths[d_key][2])
+            lengths.append(len(sub_paths[d_key][0])-1)
         # Update graph
         graph = select_best_path(graph, path, weights, lengths, delete_entry_node=True)
-    
+
     return graph
-    
+
 
 
 def solve_out_tips(graph, ending_nodes):
@@ -330,17 +336,17 @@ def solve_out_tips(graph, ending_nodes):
     for node in common_nodes:
         if node == -1:
             break
-        d = {i:paths[i] for i in paths.keys() if common_node == paths[i][1]}
+        sub_paths = {i:paths[i] for i in paths.keys() if common_node == paths[i][1]}
         path = []
         weights = []
         lengths = []
-        for d_key in d:
-            path.append(d[d_key][0])
-            weights.append(d[d_key][2])
-            lengths.append(len(d[d_key][0])-1)
+        for d_key in sub_paths:
+            path.append(sub_paths[d_key][0])
+            weights.append(sub_paths[d_key][2])
+            lengths.append(len(sub_paths[d_key][0])-1)
         # Update graph
         graph = select_best_path(graph, path, weights, lengths, delete_sink_node=True)
-    
+
     return graph
 
 def get_starting_nodes(graph):
@@ -404,13 +410,31 @@ def save_contigs(contigs_list, output_file):
       Returns:
         void
     """
-    with open(output_file, 'w') as f:
+    with open(output_file, 'w') as file:
         i = 0
         for contig in contigs_list:
             text = ">contig_{} len={}\n{}\n".format(i, contig[1], contig[0])
             text = fill(text)
-            f.write(text)
+            file.write(text)
             i += 1
+
+def draw_graph(graph, graphimg_file):
+    """ Draws the graph
+      :Parameters:
+        graph : (nx.Digraph)
+        graphimg_file : Path of file
+      Returns:
+        void
+    """
+    #graph_fig, axis = plt.subplots()
+    elarge = [(u,v) for (u,v,d) in graph.edges(data=True) if d['weight'] > 3]
+    esmall = [(u,v) for (u,v,d) in graph.edges(data=True) if d['weight'] <= 3]
+    pos = nx.random_layout(graph)
+    nx.draw_networkx_nodes(graph, pos, node_size=6)
+    nx.draw_networkx_edges(graph, pos, edgelist=elarge, width=6)
+    nx.draw_networkx_edges(graph, pos, edgelist=esmall, width=6, alpha=0.5,
+                edge_color='b', style='dashed')
+    plt.savefig(graphimg_file)
 
 #==============================================================
 # Main program
@@ -419,23 +443,31 @@ def main():
     """
     Main program function
     """
-    """
     # Get arguments
     args = get_arguments()
 
     # Build Graph
-    d = build_kmer_dict(args.fastq_file, args.kmer_size)
-    graph = build_graph(d)
+    kmer_dict = build_kmer_dict(args.fastq_file, args.kmer_size)
+    graph = build_graph(kmer_dict)
+
+    # Bubbles solving
+    graph = simplify_bubbles(graph)
+
+    # Tips solving
     starting_nodes = get_starting_nodes(graph)
     sink_nodes = get_sink_nodes(graph)
+
+    graph = solve_entry_tips(graph, starting_nodes)
+    graph = solve_out_tips(graph, sink_nodes)
 
     # Get contigs
     contigs_list = get_contigs(graph, starting_nodes, sink_nodes)
 
     # Save contigs
     save_contigs(contigs_list, args.output_file)
-    """
-    pass
+
+    # Draw Graph
+    draw_graph(graph, 'graph')
 
 if __name__ == '__main__':
     main()

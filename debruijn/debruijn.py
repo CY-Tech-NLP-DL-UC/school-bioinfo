@@ -66,7 +66,10 @@ def get_arguments():
 
 
 def read_fastq(fastq_file):
-    """ TODO
+    """ Reads a fastq file to return a generator
+      :Parameters:
+        fastq_file : Path to the file
+      Returns: yields the sequences
     """
     with open(fastq_file, 'rt') as f:
         for line in f:
@@ -78,14 +81,23 @@ def read_fastq(fastq_file):
 
 
 def cut_kmer(read, kmer_size):
-    """ TODO
+    """ Reads a sequence and yields the k-mer
+      :Parameters:
+        read : Sequence (str)
+        kmer_size : Size of kmer (int)
+      Returns: yields the kmers
     """
     for i in range(len(read) - kmer_size + 1):
         yield read[i:i+kmer_size]
 
 
 def build_kmer_dict(fastq_file, kmer_size):
-    """ TODO
+    """ Builds a dictionnary of kmers and occurences
+      :Parameters:
+        fastq_file : Path to the file
+        kmer_size : Size of kmer (int)
+      Returns:
+        out : dictionnary of kmers and occurences (dict)
     """
     out = dict()
 
@@ -99,7 +111,11 @@ def build_kmer_dict(fastq_file, kmer_size):
 
 
 def build_graph(kmer_dict):
-    """ TODO
+    """ Builds the graph using Networkx
+      :Parameters:
+        kmer_dict : dictionnary of kmers and occurences
+      Returns:
+        graph : graph of kmers (nx.Digraph)
     """
     graph = nx.DiGraph()
     for kmer in kmer_dict:
@@ -110,34 +126,130 @@ def build_graph(kmer_dict):
 
 
 def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
-    """ TODO
+    """ Removes paths from a graph
+      :Parameters:
+        graph : (nx.Digraph)
+        path_list : paths to remove (list)
+        delete_entry_node : delete entry node of the path (bool)
+        delete_sink_node : delete sink node of the path (bool)
+      Returns:
+        graph : updated graph (nx.Digraph)
     """
-    pass
+    for path in path_list:
+        for i in range(len(path)):
+            if path[i] in graph:
+                if i == 0 and delete_entry_node:
+                    graph.remove_node(path[i])
+                elif i == (len(path)-1) and delete_sink_node:
+                    graph.remove_node(path[i])
+                elif i not in [0, len(path) - 1]:
+                    graph.remove_node(path[i])
+    return graph
+
 
 def std(data):
-    """ TODO
+    """ Returns standard deviation
     """
-    pass
+    return statistics.stdev(data)
 
 
-def select_best_path(graph, path_list, path_length, weight_avg_list, 
+def select_best_path(graph, path_list, path_length, weight_avg_list,
                     delete_entry_node=False, delete_sink_node=False):
-    pass
+    """ Cleans the graph from its unecessary paths
+      :Parameters:
+        graph : (nx.Digraph)
+        path_list : paths that we want to compare (list)
+        path_length : length of each path (list (int))
+        weight_avg_list : weight average of each path (list (int))
+        delete_entry_node : delete entry node of the path (bool)
+        delete_sink_node : delete sink node of the path (bool)
+      Returns:
+        graph : updated graph (nx.Digraph)
+    """
+    if path_list == []:
+        return graph
+    # Temporary best path index
+    best_path_index = 0
+    for i in range(1, len(path_list)):
+        w1 = weight_avg_list[best_path_index]
+        w2 = weight_avg_list[i]
+        l1 = path_length[best_path_index]
+        l2 = path_length[i]
+        # Highest weight
+        if w1 < w2:
+            best_path_index = i
+        elif w1 == w2:
+            # Longest path
+            if l1 < l2:
+                best_path_index = i
+            # Random
+            elif l1 == l2:
+                best_path_index = random.choice([best_path_index, i])
+
+    # Update graph
+    path_list.remove(path_list[best_path_index])
+    graph = remove_paths(graph, path_list, delete_entry_node, delete_sink_node)
+
+    return graph
 
 def path_average_weight(graph, path):
-    """ TODO
+    """ Computes the average weight of a path
+      :Parameters:
+        graph : (nx.Digraph)
+        path : list of nodes
+      Returns:
+        out : average weight (int)
     """
-    pass
+    out = 0
+    if len(path) != 0:
+        for i in range(len(path)-1):
+            for n, nbrs in graph.adj.items():
+                if n == path[i]:
+                    for nbr, eattr in nbrs.items():
+                        out += eattr['weight']
+                        break
+                    break
+        out /= (len(path)-1)
+    return out
 
 def solve_bubble(graph, ancestor_node, descendant_node):
-    """ TODO
+    """ Removes bubbles from parts of a graph
+      :Parameters:
+        graph : (nx.Digraph)
+        ancestor_node : node
+        descendant_node : node
+      Returns:
+        graph : (nx.Digraph)
     """
-    pass
+    # Get all possibles paths from ancestor to descendant
+    paths = list(nx.all_simple_paths(graph, ancestor_node, descendant_node))
+
+    # Find best path in graph
+    path_length = []
+    weight_avg_list = []
+    for path in paths:
+        path_length.append(len(path))
+        weight_avg_list.append(int(path_average_weight(graph, path)))
+
+    graph = select_best_path(graph, paths, path_length, weight_avg_list)
+
+    return graph
 
 def simplify_bubbles(graph):
-    """ TODO
+    """ Removes every bubbles from a graph
+      :Parameters:
+        graph : (nx.Digraph)
+      Returns:
+        graph : (nx.Digraph)
     """
-    pass
+    starting_nodes = get_starting_nodes(graph)
+    ending_nodes = get_sink_nodes(graph)
+
+    for start in starting_nodes:
+        for end in ending_nodes:
+            graph = solve_bubble(graph, start, end)
+
+    return graph
 
 def solve_entry_tips(graph, starting_nodes):
     """ TODO
@@ -150,7 +262,11 @@ def solve_out_tips(graph, ending_nodes):
     pass
 
 def get_starting_nodes(graph):
-    """ TODO
+    """ Finds every starting nodes in a graph
+      :Parameters:
+        graph : (nx.Digraph)
+      Returns:
+        nodes : nodes that do not have predecessors (list)
     """
     nodes = []
     for node in graph.nodes:
@@ -159,7 +275,11 @@ def get_starting_nodes(graph):
     return nodes
 
 def get_sink_nodes(graph):
-    """ TODO
+    """ Finds every sink nodes in a graph
+      :Parameters:
+        graph : (nx.Digraph)
+      Returns:
+        nodes : nodes that do not have successors (list)
     """
     nodes = []
     for node in graph.nodes:
@@ -168,7 +288,13 @@ def get_sink_nodes(graph):
     return nodes
 
 def get_contigs(graph, starting_nodes, ending_nodes):
-    """ TODO
+    """ Finds contigs in a graph
+      :Parameters:
+        graph : (nx.Digraph)
+        starting_nodes : list of nodes (list)
+        ending_nodes : list of nodes (list)
+      Returns:
+        out : list of tuples with a path and its length (list)
     """
     out = []
     for start in starting_nodes:
@@ -189,7 +315,12 @@ def fill(text, width=80):
     return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
 
 def save_contigs(contigs_list, output_file):
-    """ TODO
+    """ Save a contig list following a specific format
+      :Parameters:
+        contigs_list : list of contigs (list)
+        output_file : Path of the file
+      Returns:
+        void
     """
     with open(output_file, 'w') as f:
         i = 0
@@ -206,6 +337,7 @@ def main():
     """
     Main program function
     """
+    """
     # Get arguments
     args = get_arguments()
 
@@ -220,7 +352,8 @@ def main():
 
     # Save contigs
     save_contigs(contigs_list, args.output_file)
-
+    """
+    pass
 
 if __name__ == '__main__':
     main()

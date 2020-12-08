@@ -167,6 +167,7 @@ def select_best_path(graph, path_list, path_length, weight_avg_list,
         graph : updated graph (nx.Digraph)
     """
     if path_list == []:
+        print("select_best_path: Empty path list")
         return graph
     # Temporary best path index
     best_path_index = 0
@@ -201,13 +202,14 @@ def path_average_weight(graph, path):
         out : average weight (int)
     """
     out = 0
-    if len(path) != 0:
+    if len(path) > 1:
         for i in range(len(path)-1):
             for n, nbrs in graph.adj.items():
                 if n == path[i]:
                     for nbr, eattr in nbrs.items():
-                        out += eattr['weight']
-                        break
+                        if path[i+1] == nbr:
+                            out += eattr['weight']
+                            break
                     break
         out /= (len(path)-1)
     return out
@@ -252,14 +254,94 @@ def simplify_bubbles(graph):
     return graph
 
 def solve_entry_tips(graph, starting_nodes):
-    """ TODO
+    """ Removes unecessary entry nodes in a graph
+      :Parameters:
+        graph : (nx.Digraph)
+        starting_nodes : list of nodes
+      Returns:
+        graph : (nx.Digraph)
     """
-    pass
+    # Paths identification
+    paths = {}
+    common_nodes = []
+    for start in starting_nodes:
+        # Find node with several predecessors
+        common_node = -1
+        full_path = nx.dfs_edges(graph,start)
+        path = []
+        for edge in full_path:
+            if path == []:
+                path.append(edge[0])
+            path.append(edge[1])
+            if len(list(graph.predecessors(edge[1]))) > 1 :
+                common_node = edge[1]
+                if common_node not in common_nodes:
+                    common_nodes.append(common_node)
+                break
+        paths[start] = (path, common_node, int(path_average_weight(graph, path)))
+    
+    # Select best paths
+    for node in common_nodes:
+        if node == -1:
+            break
+        d = {i:paths[i] for i in paths.keys() if common_node == paths[i][1]}
+        path = []
+        weights = []
+        lengths = []
+        for d_key in d:
+            path.append(d[d_key][0])
+            weights.append(d[d_key][2])
+            lengths.append(len(d[d_key][0])-1)
+        # Update graph
+        graph = select_best_path(graph, path, weights, lengths, delete_entry_node=True)
+    
+    return graph
+    
+
 
 def solve_out_tips(graph, ending_nodes):
-    """ TODO
+    """ Removes unecessary ending nodes in a graph
+      :Parameters:
+        graph : (nx.Digraph)
+        ending_nodes : list of nodes
+      Returns:
+        graph : (nx.Digraph)
     """
-    pass
+    # Paths identification
+    paths = {}
+    common_nodes = []
+    for end in ending_nodes:
+        # Find node with several predecessors
+        common_node = -1
+        full_path = nx.edge_dfs(graph,end, orientation='reverse')
+        path = []
+        for edge in full_path:
+            if path == []:
+                path.append(edge[0])
+            path.append(edge[1])
+            if len(list(graph.successors(edge[0]))) > 1 :
+                common_node = edge[0]
+                if common_node not in common_nodes:
+                    common_nodes.append(common_node)
+                break
+        paths[end] = (path, common_node, int(path_average_weight(graph, path)))
+
+    # Select best paths
+    for node in common_nodes:
+        if node == -1:
+            break
+        d = {i:paths[i] for i in paths.keys() if common_node == paths[i][1]}
+        path = []
+        weights = []
+        lengths = []
+        for d_key in d:
+            path.append(d[d_key][0])
+            weights.append(d[d_key][2])
+            lengths.append(len(d[d_key][0])-1)
+        # Update graph
+        graph = select_best_path(graph, path, weights, lengths, delete_sink_node=True)
+    
+    return graph
 
 def get_starting_nodes(graph):
     """ Finds every starting nodes in a graph
